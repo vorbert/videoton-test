@@ -14,6 +14,7 @@ using System.Windows.Forms;
 using static GetID.GetID;
 using static System.Net.Mime.MediaTypeNames;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using Microsoft.Extensions.Logging;
 
 namespace VideotonTestApp
 {
@@ -24,12 +25,18 @@ namespace VideotonTestApp
 
         GetID.GetID getId = new GetID.GetID();
 
+        private readonly ILogger _logger = LoggerFactory.Create(builder => builder.AddConsole().AddDebug().SetMinimumLevel(LogLevel.Trace)).CreateLogger<Program>();
+
+        private SimpleLogging _simpleLog;
+
         public MainForm()
         {
             InitializeComponent();
 
             getId.ValueChanged += GetIdValueChanged;
             getId.ErrorChanged += GetIdErrorChanged;
+
+            _simpleLog = new SimpleLogging(_logger);
         }
 
         /**
@@ -77,7 +84,10 @@ namespace VideotonTestApp
                 }
                 else
                 {
-                    MsgTextBox.AppendText("A GetId szolgáltatás nem fut! Kérjük lépjen kapcsolatba az adminisztrátorral!\r\n");
+                    string logMsg = "A GetId szolgáltatás nem fut! Kérjük lépjen kapcsolatba az adminisztrátorral!";
+                    MsgTextBox.AppendText($"{logMsg}\r\n");
+                    _simpleLog.itLogsError(logMsg);
+
                     getId.Stop();
                     goBtn.Enabled = true;
                     stopBtn.Enabled = false;
@@ -116,7 +126,10 @@ namespace VideotonTestApp
             }
             else
             {
-                MsgTextBox.AppendText("A GetId szolgáltatást nem sikerült leállítani! Kérjük lépjen kapcsolatba az adminisztrátorral!\r\n");
+                string logMsg = "A GetId szolgáltatást nem sikerült leállítani! Kérjük lépjen kapcsolatba az adminisztrátorral!";
+                MsgTextBox.AppendText($"{logMsg}\r\n");
+                MessageBox.Show($"Hiba! {logMsg}");
+                _simpleLog.itLogsError(logMsg);
             }
         }
 
@@ -125,7 +138,7 @@ namespace VideotonTestApp
          */
         private void addErrorToTextBox()
         {
-            this.setText($"A GetId szolgáltatásban hiba lépett fel! Kérjük lépjen kapcsolatba az adminisztrátorral! \r\nHibakód: {getId.ErrorMessage}\r\n", false);
+            this.setText($"A GetId szolgáltatásban hiba lépett fel! Kérjük lépjen kapcsolatba az adminisztrátorral! \r\nHibakód: {getId.ErrorMessage}\r\n", true);
         }
 
 
@@ -146,7 +159,7 @@ namespace VideotonTestApp
                 verdict = "- NEM MEGFELELŐ";
             }
 
-            this.setText($"{getId.Value} {verdict}\r\n", true);
+            this.setText($"{getId.Value} {verdict}\r\n", false);
         }
 
         /**
@@ -167,9 +180,20 @@ namespace VideotonTestApp
                     this.MsgTextBox.SelectionStart = this.MsgTextBox.Text.Length;
 
                     // hadling stop on error, or if we run out of storage space
-                    if (this.MsgTextBox.Text.Length >= (this.MsgTextBox.MaxLength - 200) || !isError)
+                    if (this.MsgTextBox.Text.Length >= (this.MsgTextBox.MaxLength - 50) || isError)
                     {
                         this.stopGetIdRunning();
+
+                        if(isError)
+                        {
+                            MessageBox.Show($"Hiba! {text}");
+                            _simpleLog.itLogsError(text);
+                        } else
+                        {
+                            string logMsg = "TextBox megjelenítési kapacitása megtelt.";
+                            MessageBox.Show(logMsg);
+                            _simpleLog.itLogsInfo(logMsg);
+                        }
                     }
                 }                
             }
@@ -204,12 +228,17 @@ namespace VideotonTestApp
                 } 
                 else
                 {
-                    MessageBox.Show("Hiba! Nincs elég adat a mentéshez!");
+                    string logMsg = "Nincs elég adat a mentéshez!";
+                    MessageBox.Show($"Hiba! {logMsg}");
+                    _simpleLog.itLogsError(logMsg);
                 }
             } catch (Exception ex)
             {
-                MessageBox.Show($"Adat mentés közben hiba történt. \r\nError: {ex.Message}");
+                string logMsg = $"Adat mentés közben hiba történt. \r\nError: {ex.Message}";
+                MessageBox.Show($"Hiba! {logMsg}");
+                _simpleLog.itLogsError(logMsg);
             }
         }
+
     }
 }
